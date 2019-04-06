@@ -1,0 +1,166 @@
+<%inherit file="/base.html"/>
+
+<%block name="content">
+<div class="king-layout2-main mt15" style="width:960px;">
+    <form class="form-horizontal">
+        <div class="form-group clearfix ">
+            <label class="col-sm-3 control-label bk-lh30 pt0">选择业务：</label>
+            <div class="col-sm-9">
+                <select id="biz" class="form-control bk-valign-top" onchange="get_cluster(0)">
+                </select>
+            </div>
+        </div>
+        <div class="form-group clearfix ">
+            <label class="col-sm-3 control-label bk-lh30 pt0">选择集群：</label>
+            <div class="col-sm-9">
+                <select id="cluster" class="form-control bk-valign-top">
+                </select>
+            </div>
+        </div>
+        <div class="form-group clearfix">
+            <div class="col-sm-9 col-sm-offset-3">
+                <button type="button" class="king-btn mr10  king-info" id="search-host">查询主机</button>
+                <button type="button" class="king-btn mr10  king-success" id="execute-task">执行作业</button>
+            </div>
+        </div>
+    </form>
+    <div class="panel panel-default mb0">
+        <div class="panel-heading">主机列表</div>
+        <div class="panel-body">
+            <table class="table mb0 pr15 ranger-box2  ">
+                <thead>
+                <tr>
+                    <th>内网IP</th>
+                    <th>系统名</th>
+                    <th>主机名</th>
+                    <th>云区域</th>
+                </tr>
+                </thead>
+                <tbody id="host_info">
+                <tr data-ip="10.0.1.33" data-bk_cloud_id="0">
+                    <td>10.0.1.33</td>
+                    <td>linux centos</td>
+                    <td>gse-2</td>
+                    <td>default area</td>
+
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <!-- 设置面板End -->
+</div>
+<template id="tpl_biz">
+    <option value="#biz_id#">#biz_name#</option>
+</template>
+<template id="tpl_cluster">
+    <option value="#bk_set_id#">#bk_set_name#</option>
+</template>
+<template id="tpl_host_info">
+    <tr data-bk_host_innerip="#bk_host_innerip#" data-bk_inst_id="#bk_inst_id#">
+        <td>#bk_host_innerip#</td>
+        <td>#bk_os_name#</td>
+        <td>#bk_host_name#</td>
+        <td>#bk_inst_id#</td>
+
+    </tr>
+</template>
+</%block>
+
+<script>
+    function renderTpl(str, cfg) {
+        var re = /(#(.+?)#)/g;
+        return str.replace(re, function () {
+            var val = cfg[arguments[2]] + '';
+            if (typeof val == 'undefined') {
+                val = '';
+            }
+            return val;
+        });
+    }
+
+    function get_biz_list() {
+        // 异步请求后台数据
+        $.ajax({
+            url: '${SITE_URL}get_biz_list',  //'http://dev.gzdwt.com/get_biz'
+            type: 'POST',
+            data: {},
+            success: function (res) {
+                var _html = ' ';
+                var list = res.data;
+                var tpl = $('template#tpl_biz').html();
+                var biz_id = 0;
+                for (var i = 0, len = list.length; i < len; i++) {
+                    if (i == 0) {
+                        biz_id = list[0]['biz_id']
+                    }
+                    var item = list[i];
+                    _html += renderTpl(tpl, item)
+                }
+                $('select#biz').html(_html);
+                get_cluster(biz_id)
+            }
+        });
+    }
+
+    function get_cluster(one_id) {
+        var biz_id = 0;
+        if (one_id != 0) {
+            biz_id = one_id;
+        } else {
+            biz_id = $('.biz').val();
+        }
+
+        $.post('${SITE_URL}get_cluster', {'biz_id': biz_id}, function (res) {
+            if (res.result) {
+                var _html = ' ';
+                var list = res.data;
+                var tpl = $('template#tpl_cluster').html()
+                for (var i = 0, len = list.length; i < len; i++) {
+                    var item = list[i];
+                    _html += renderTpl(tpl, item)
+                }
+                $('select#cluster').html(_html);
+            }
+
+        })
+    }
+
+    $('#search-host').click(function () {
+        var biz_id = $('#biz').val()
+        var set_id = $('#cluster').val()
+        $.post('${SITE_URL}search_host_info', {'biz_id': biz_id, 'set_id': set_id}, function (res) {
+            if (res.result) {
+                var _html = ' ';
+                var list = res.data;
+                var tpl = $('template#tpl_host_info').html()
+                for (var i = 0, len = list.length; i < len; i++) {
+                    var item = list[i];
+                    _html += renderTpl(tpl, item)
+                }
+                $('#host_info').html(_html);
+            }
+        })
+
+    })
+    $('#execute-task').click(function () {
+        var biz_id = $('#biz').val()
+        var tr_obj = $('#host_info').children()
+        var ips_list =[]
+        for (var i=0;i<tr_obj.length;i++){
+            var ip = $(tr_obj[i]).data('bk_host_innerip')
+            var inst_id = $(tr_obj[i]).data('bk_inst_id')
+            ips_list.push({'bk_cloud_id':inst_id,'ip':ip})
+        }
+        $.post('{SITE_URL}execute_task',{'ip':ips_list,'job_id':35,'biz_id':biz_id},function (res) {
+
+
+        })
+    })
+
+
+    $(function () {
+        get_biz_list()
+    });
+</script>
+
